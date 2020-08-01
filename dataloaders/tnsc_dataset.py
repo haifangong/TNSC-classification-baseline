@@ -59,7 +59,7 @@ class TNSCDataset(data.Dataset):
         self.transform = transform
         self.return_size = return_size
 
-        root = '/home/duadua/TNSC/classifier/data/'
+        root = 'root2yourfolder'
         trainval = json.load(open(root + 'trainval'+str(fold)+'.json', 'r'))  # seeds for k-fold cross validation
         if mode == 'train':
             imgs = make_dataset(root, trainval['train'])
