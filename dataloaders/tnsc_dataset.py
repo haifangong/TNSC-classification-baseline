@@ -53,41 +53,11 @@ def get_bbox(mask):
     return stats
 
 
-def get_edge(mask_path, img_path):
-    image = cv2.imread(img_path)
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-
-    mask = cv2.imread(mask_path)
-    mask = cv2.cvtColor(mask, cv2.COLOR_RGB2GRAY)
-
-    # 范围
-    kernel = np.ones((5, 5), np.uint8)
-
-    # 迭代次数 iterations=1
-    erosion = cv2.erode(mask, kernel, iterations=2)
-    inner_mask = cv2.bitwise_not(erosion)
-
-    # 迭代次数
-    img_dilate = cv2.dilate(mask, kernel, iterations=9)
-    final_mask = cv2.bitwise_and(inner_mask, img_dilate)
-    final_img = cv2.bitwise_and(image, final_mask)
-    return final_img
-
-
-def get_inner(mask_path, image_path):
-    img = cv2.imread(image_path)
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    mask = cv2.imread(mask_path)
-    mask = cv2.cvtColor(mask, cv2.COLOR_RGB2GRAY)
-    image = cv2.bitwise_and(mask, img)
-    return image
-
 class TNSCDataset(data.Dataset):
     def __init__(self, mode='train', transform=None, return_size=False, fold=4):
         self.mode = mode
         self.transform = transform
         self.return_size = return_size
-        self.type = 'edge'  # inner, edge
 
         root = '/home/duadua/TNSC/classifier/data/'
         trainval = json.load(open(root + 'trainval'+str(fold)+'.json', 'r'))  # seeds for k-fold cross validation
@@ -113,26 +83,12 @@ class TNSCDataset(data.Dataset):
 
         stats = get_bbox(mask_path)
         x, y, w, h = stats
-
-        if self.type == 'context':
-            image = Image.open(image_path).convert('RGB')
-            x1 = x - 0.25 * w if x - 0.25 * w >= 0 else 0
-            y1 = y - 0.25 * h if y - 0.25 * h >= 0 else 0
-            w1 = 1.5 * w if x1 + 1.5 * w <= image.size[0] else image.size[0]
-            h1 = 1.5 * h if y1 + 1.5 * h <= image.size[1] else image.size[1]
-            image = image.crop((x1, y1, x1 + w1, y1 + h1))
-        elif self.type == 'inner':
-            image = get_inner(mask_path, image_path)
-            image = Image.fromarray(image).convert('RGB')
-            image = image.crop((x, y, x+w, y+h))
-        elif self.type == 'edge':
-            image = get_edge(mask_path, image_path)
-            image = Image.fromarray(image).convert('RGB')
-            x1 = x - 0.25 * w if x - 0.25 * w >= 0 else 0
-            y1 = y - 0.25 * h if y - 0.25 * h >= 0 else 0
-            w1 = 1.5 * w if x1 + 1.5 * w <= image.size[0] else image.size[0]
-            h1 = 1.5 * h if y1 + 1.5 * h <= image.size[1] else image.size[1]
-            image = image.crop((x1, y1, x1 + w1, y1 + h1))
+        image = Image.open(image_path).convert('RGB')
+        x1 = x - 0.25 * w if x - 0.25 * w >= 0 else 0
+        y1 = y - 0.25 * h if y - 0.25 * h >= 0 else 0
+        w1 = 1.5 * w if x1 + 1.5 * w <= image.size[0] else image.size[0]
+        h1 = 1.5 * h if y1 + 1.5 * h <= image.size[1] else image.size[1]
+        image = image.crop((x1, y1, x1 + w1, y1 + h1))
 
         w, h = image.size
         size = (h, w)

@@ -19,6 +19,7 @@ def get_arguments():
     # Model setting
     parser.add_argument('-backbone', type=str, default='resnest50')
     parser.add_argument('-input_size', type=int, default=224)
+    parser.add_argument('-model_path', type=str, default='path2model')
 
     # Training setting
     parser.add_argument('-seed', type=int, default=1234)
@@ -58,7 +59,7 @@ def main(args):
     else:
         raise NotImplementedError
 
-    backbone.load_state_dict(torch.load('/home/duadua/TNSC/classifier/run/CROP-resnest50-Tricks/run_1/models/best_backbone_e61.pth', map_location=lambda storage, loc: storage))
+    backbone.load_state_dict(torch.load(args.model_path, map_location=lambda storage, loc: storage))
     torch.cuda.set_device(device=0)
     backbone.cuda()
 
