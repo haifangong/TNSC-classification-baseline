@@ -1,24 +1,15 @@
-import socket
 import argparse
-from datetime import datetime
-import time
 import os
-import glob
+
 import torch
 from resnest.torch import resnest50
-from torchvision import transforms
-import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision.utils import make_grid
-
-from tensorboardX import SummaryWriter
+from torchvision import transforms
+from torchvision.models.resnet import resnet34, resnet18, resnet50, resnet101
 from tqdm import tqdm
 
-from dataloaders import tnsc_dataset
 from dataloaders import custom_transforms as trforms
-
-from torchvision.models.resnet import resnet34, resnet18, resnet50, resnet101
-import utils
+from dataloaders import tnsc_dataset
 
 
 def get_arguments():

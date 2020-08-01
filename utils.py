@@ -1,12 +1,27 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from torch.autograd import Variable
-from torch.optim import Optimizer
+from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+def load_pretrain_model(net, weights):
+    net_keys = list(net.state_dict().keys())
+    weights_keys = list(weights.keys())
+    # assert(len(net_keys) <= len(weights_keys))
+    i = 0
+    j = 0
+    while i < len(net_keys) and j < len(weights_keys):
+        name_i = net_keys[i]
+        name_j = weights_keys[j]
+        if net.state_dict()[name_i].shape == weights[name_j].shape:
+            net.state_dict()[name_i].copy_(weights[name_j].cpu())
+            i += 1
+            j += 1
+        else:
+            i += 1
+    return net
 
 
 class WarmUpLR(_LRScheduler):
@@ -59,71 +74,6 @@ def smooth(label, classes, eta=0.1):
 def CELoss(logit, target, reduction='mean'):
     criterion = nn.CrossEntropyLoss(reduction=reduction)
     return criterion(logit, target)
-
-
-class FocalLossB(nn.Module):
-    r"""
-        This criterion is a implemenation of Focal Loss, which is proposed in
-        Focal Loss for Dense Object Detection.
-
-            Loss(x, class) = - \alpha (1-softmax(x)[class])^gamma \log(softmax(x)[class])
-
-        The losses are averaged across observations for each minibatch.
-
-        Args:
-            alpha(1D Tensor, Variable) : the scalar factor for this criterion
-            gamma(float, double) : gamma > 0; reduces the relative loss for well-classiﬁed examples (p > .5),
-                                   putting more focus on hard, misclassiﬁed examples
-            size_average(bool): By default, the losses are averaged over observations for each minibatch.
-                                However, if the field size_average is set to False, the losses are
-                                instead summed for each minibatch.
-
-
-    """
-
-    def __init__(self, class_num=2, alpha=None, gamma=2, size_average=False):
-        super(FocalLossB, self).__init__()
-        if alpha is None:
-            self.alpha = Variable(torch.ones(class_num, 1))
-        else:
-            if isinstance(alpha, Variable):
-                self.alpha = alpha
-            else:
-                self.alpha = Variable(torch.tensor(alpha).long())
-        self.gamma = gamma
-        self.class_num = class_num
-        self.size_average = size_average
-
-    def forward(self, inputs, targets):
-        N = inputs.size(0)
-        C = inputs.size(1)
-        P = F.softmax(inputs)
-
-        class_mask = inputs.data.new(N, C).fill_(0)
-        class_mask = Variable(class_mask)
-        ids = targets.view(-1, 1)
-        class_mask.scatter_(1, ids.data, 1.)
-        # print(class_mask)
-
-        if inputs.is_cuda and not self.alpha.is_cuda:
-            self.alpha = self.alpha.cuda()
-        alpha = self.alpha[ids.data.view(-1)]
-
-        probs = (P * class_mask).sum(1).view(-1, 1)
-
-        log_p = probs.log()
-        # print('probs size= {}'.format(probs.size()))
-        # print(probs)
-
-        batch_loss = -alpha * (torch.pow((1 - probs), self.gamma)) * log_p
-        # print('-----bacth_loss------')
-        # print(batch_loss)
-
-        if self.size_average:
-            loss = batch_loss.mean()
-        else:
-            loss = batch_loss.sum()
-        return loss
 
 
 class SGD_GC(Optimizer):
@@ -333,9 +283,9 @@ class LabelSmoothingCrossEntropy(nn.Module):
         return loss * self.eps / c + (1 - self.eps) * F.nll_loss(log_preds, target, reduction=self.reduction)
 
 
-class LabelSmoothingCrossEntropyN(nn.Module):
+class LabelSmoothingCrossEntropyWithLMSCE(nn.Module):
     def __init__(self, eps=0.1, reduction='mean'):
-        super(LabelSmoothingCrossEntropyN, self).__init__()
+        super(LabelSmoothingCrossEntropyWithLMSCE, self).__init__()
         self.eps = eps
         self.reduction = reduction
         self.loss_F = LargeMarginInSoftmaxLoss(reduction=self.reduction)

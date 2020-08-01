@@ -20,7 +20,6 @@ from dataloaders import custom_transforms as trforms
 # from resnest.torch import resnest50
 from torchvision.models.resnet import resnet34, resnet18, resnet50, resnet101
 import utils
-import numpy as np
 
 from model.resnest50 import resnest50
 
@@ -32,6 +31,7 @@ def get_arguments():
     # Model setting
     parser.add_argument('-backbone', type=str, default='resnest50')
     parser.add_argument('-input_size', type=int, default=224)
+    parser.add_argument('-pretrain', type=str, default='../pre_train/resnest50-528c19ca.pth')
 
     # Training setting
     parser.add_argument('-seed', type=int, default=1234)
@@ -39,7 +39,7 @@ def get_arguments():
     parser.add_argument('-batch_size', type=int, default=16)
     parser.add_argument('-nepochs', type=int, default=50)
     parser.add_argument('-resume_epoch', type=int, default=0)
-    parser.add_argument('-train_fold', type=str, default='edge-five-fold')
+    parser.add_argument('-train_fold', type=str, default='five-fold')
     parser.add_argument('-run_id', type=int, default=-1)
 
     # Optimizer setting
@@ -86,29 +86,11 @@ def main(args):
     elif args.backbone == 'resnet101':
         backbone = resnet101(nInputChannels=3, os=32, pretrained=True)
     elif args.backbone == 'resnest50':
-        def load_pretrain_model(net, weights):
-            net_keys = list(net.state_dict().keys())
-            weights_keys = list(weights.keys())
-            # assert(len(net_keys) <= len(weights_keys))
-            i = 0
-            j = 0
-            while i < len(net_keys) and j < len(weights_keys):
-                name_i = net_keys[i]
-                name_j = weights_keys[j]
-                if net.state_dict()[name_i].shape == weights[name_j].shape:
-                    net.state_dict()[name_i].copy_(weights[name_j].cpu())
-                    i += 1
-                    j += 1
-                else:
-                    i += 1
-            # print i, len(net_keys), j, len(weights_keys)
-            return net
-        model_path = '/home/duadua/TNSC/deeplabv3+/pre_train/resnest50-528c19ca.pth'
         backbone = resnest50(num_classes=args.classes)
-        backbone = load_pretrain_model(backbone, torch.load(model_path))
     else:
         raise NotImplementedError
 
+    backbone = utils.load_pretrain_model(backbone, torch.load(args.pretrain))
     save_dir_root = os.path.join(os.path.dirname(os.path.abspath(__file__)))
     if args.resume_epoch != 0:
         runs = sorted(glob.glob(os.path.join(save_dir_root, 'run', args.train_fold, 'run_*')))
@@ -209,7 +191,7 @@ def main(args):
                 if args.label_smooth:
                     criterion = utils.LabelSmoothingCrossEntropy()
                 else:
-                    # criterion = utils.FocalLossB()
+                    # criterion = utils.FocalLossV1()
                     criterion = nn.CrossEntropyLoss()
                 loss = loss_func(criterion, outputs)
 
@@ -242,7 +224,7 @@ def main(args):
                 grid_image = make_grid(img[:3].clone().cpu().data, 3, normalize=True)
                 writer.add_image('Image', grid_image, global_step)
 
-                # validation
+        # validation
         backbone.eval()
         acc = 0.0
 
